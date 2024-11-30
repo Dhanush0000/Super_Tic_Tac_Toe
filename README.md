@@ -13,10 +13,4 @@ Super Tic-Tac-Toe is a dynamic twist on the classic game of Tic-Tac-Toe, introdu
 🚀 Interactive and user-friendly interface.
 
 
-## Current Status
-🚧 Under Development
 
-Stay tuned for updates as the project progresses!
-
-##Technologies
-Java
