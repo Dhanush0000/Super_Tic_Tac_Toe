@@ -4,12 +4,13 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 public class SuperTicTacToe extends JFrame implements ActionListener {
-    // The game is a 3x3 grid of mini-Tic-Tac-Toe boards
-    private JButton[][][] buttons = new JButton[3][3][9];  // 3x3 grid of mini-boards, each mini-board has 9 buttons
-    private String currentPlayer = "X";  // Track current player
-    private int nextBoard = -1;  // -1 means no board restriction, otherwise tracks where the opponent must play next
-    private boolean[][] miniBoardWon = new boolean[3][3];  // Tracks if a mini-board is won
-    private boolean gameOver = false;
+    // 3x3 grid of mini-Tic-Tac-Toe boards, each containing 9 buttons
+    private JButton[][][] buttons = new JButton[3][3][9];
+    private String currentPlayer = "X";  // The current player (X or O)
+    private int nextBoard = -1;  // The mini-board that the next player must play in, -1 means no restriction
+    private boolean[][] miniBoardWon = new boolean[3][3];  // Tracks whether a mini-board is won
+    private boolean gameOver = false;  // Game over flag
+    private boolean gameTied = false;  // Track if the game ends in a tie
 
     public SuperTicTacToe() {
         setTitle("Super Tic-Tac-Toe");
@@ -17,12 +18,12 @@ public class SuperTicTacToe extends JFrame implements ActionListener {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setResizable(false);
         setLocationRelativeTo(null);  // Center the window
-        setLayout(new GridLayout(3, 3));  // Main 3x3 grid layout for the mini-boards
+        setLayout(new GridLayout(3, 3));  // Main 3x3 grid layout for mini-boards
 
         // Initialize mini-boards (9 buttons per mini-board)
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                JPanel miniBoardPanel = new JPanel(new GridLayout(3, 3));
+                JPanel miniBoardPanel = new JPanel(new GridLayout(3, 3)); // 3x3 grid for each mini-board
                 for (int k = 0; k < 9; k++) {
                     buttons[i][j][k] = new JButton("");
                     buttons[i][j][k].setFont(new Font("Arial", Font.PLAIN, 40));
@@ -40,64 +41,70 @@ public class SuperTicTacToe extends JFrame implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (gameOver) return;
+        if (gameOver) return;  // Stop if the game is over
 
-        // Determine which button was clicked
         JButton clickedButton = (JButton) e.getSource();
-        int clickedIndex = -1;
 
-        // Find the mini-board and the button index clicked
+        // Find the mini-board and index clicked
+        int clickedIndex = -1;
+        int row = -1, col = -1;
         outerLoop:
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 for (int k = 0; k < 9; k++) {
                     if (buttons[i][j][k] == clickedButton) {
                         clickedIndex = k;
+                        row = i;
+                        col = j;
                         break outerLoop;
                     }
                 }
             }
         }
 
-        int targetMiniBoardRow = clickedIndex % 3;
-        int targetMiniBoardCol = clickedIndex / 3;
+        // Check if the mini-board is restricted and ensure it's not already won or tied
+        int targetRow = clickedIndex / 3;
+        int targetCol = clickedIndex % 3;
 
-        // If the move is invalid (either the mini-board is restricted or already won), do nothing
-        if (nextBoard != -1 && (targetMiniBoardRow != nextBoard % 3 || targetMiniBoardCol != nextBoard / 3 || miniBoardWon[targetMiniBoardRow][targetMiniBoardCol])) {
-            return;
+        if ((nextBoard != -1 && (nextBoard != targetRow * 3 + targetCol || miniBoardWon[targetRow][targetCol])) || !clickedButton.getText().equals("")) {
+            return;  // Invalid move
         }
-
-        // If the button is already marked, do nothing
-        if (!clickedButton.getText().equals("")) return;
 
         // Mark the button with the current player's symbol
         clickedButton.setText(currentPlayer);
 
         // Check if the current mini-board is won
-        if (checkMiniBoardWin(targetMiniBoardRow, targetMiniBoardCol)) {
-            miniBoardWon[targetMiniBoardRow][targetMiniBoardCol] = true;
+        if (checkMiniBoardWin(row, col)) {
+            miniBoardWon[row][col] = true;
         }
 
-        // Check for overall game win (main 3x3 board)
+        // Check if the entire game is won (main 3x3 grid)
         if (checkMainBoardWin()) {
             JOptionPane.showMessageDialog(this, currentPlayer + " Wins the game!");
             gameOver = true;
             return;
         }
 
-        // If mini-board is won, reset the restriction to -1 (no restriction), else set the next move
-        if (miniBoardWon[targetMiniBoardRow][targetMiniBoardCol]) {
-            nextBoard = -1;  // opponent can play anywhere
-        } else {
-            nextBoard = targetMiniBoardRow * 3 + targetMiniBoardCol;  // set the restricted mini-board
+        // Check if the game is a draw
+        if (checkDraw()) {
+            JOptionPane.showMessageDialog(this, "It's a draw!");
+            gameOver = true;
+            return;
         }
 
-        // Switch players
-        currentPlayer = currentPlayer.equals("X") ? "O" : "X";
+        // Determine where the opponent must play next
+        if (miniBoardWon[row][col]) {
+            nextBoard = -1;  // No restrictions, opponent can play anywhere
+        } else {
+            nextBoard = targetRow * 3 + targetCol;  // Restrict opponent to play in the corresponding mini-board
+        }
+
+        // Switch the player
+        currentPlayer = (currentPlayer.equals("X")) ? "O" : "X";
     }
 
     private boolean checkMiniBoardWin(int row, int col) {
-        // Check all win conditions (horizontal, vertical, diagonal) for the mini-board
+        // Winning conditions for a mini-board (3 rows, 3 columns, 2 diagonals)
         int[][] winPatterns = {
                 {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  // Rows
                 {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  // Columns
@@ -111,22 +118,32 @@ public class SuperTicTacToe extends JFrame implements ActionListener {
                 return true;
             }
         }
-
         return false;
     }
 
     private boolean checkMainBoardWin() {
-        // Check if any 3 mini-boards in a row are all won (horizontal, vertical, diagonal)
+        // Check if three mini-boards in a row are won horizontally, vertically, or diagonally
         for (int i = 0; i < 3; i++) {
-            // Check horizontal, vertical, and diagonal
-            if (miniBoardWon[i][0] && miniBoardWon[i][1] && miniBoardWon[i][2]) return true;
-            if (miniBoardWon[0][i] && miniBoardWon[1][i] && miniBoardWon[2][i]) return true;
+            if (miniBoardWon[i][0] && miniBoardWon[i][1] && miniBoardWon[i][2]) return true;  // Rows
+            if (miniBoardWon[0][i] && miniBoardWon[1][i] && miniBoardWon[2][i]) return true;  // Columns
         }
-        // Diagonal
-        if (miniBoardWon[0][0] && miniBoardWon[1][1] && miniBoardWon[2][2]) return true;
-        if (miniBoardWon[0][2] && miniBoardWon[1][1] && miniBoardWon[2][0]) return true;
-
+        if (miniBoardWon[0][0] && miniBoardWon[1][1] && miniBoardWon[2][2]) return true;  // Diagonal
+        if (miniBoardWon[0][2] && miniBoardWon[1][1] && miniBoardWon[2][0]) return true;  // Diagonal
         return false;
+    }
+
+    private boolean checkDraw() {
+        // Check if the game is a draw (all mini-boards are filled but no one has won)
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                for (int k = 0; k < 9; k++) {
+                    if (buttons[i][j][k].getText().equals("")) {
+                        return false;  // Found an empty spot, so the game is not a draw
+                    }
+                }
+            }
+        }
+        return true;  // No empty spots left, the game is a draw
     }
 
     public static void main(String[] args) {
