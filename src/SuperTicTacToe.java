@@ -1,152 +1,184 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
-public class SuperTicTacToe extends JFrame implements ActionListener {
-    // 3x3 grid of mini-Tic-Tac-Toe boards, each containing 9 buttons
-    private JButton[][][] buttons = new JButton[3][3][9];
-    private String currentPlayer = "X";  // The current player (X or O)
-    private int nextBoard = -1;  // The mini-board that the next player must play in, -1 means no restriction
-    private boolean[][] miniBoardWon = new boolean[3][3];  // Tracks whether a mini-board is won
-    private boolean gameOver = false;  // Game over flag
-    private boolean gameTied = false;  // Track if the game ends in a tie
+public class SuperTicTacToe extends JFrame {
+    private final Panel[][] boards;
+    private final Player[] players;
+    private int currentPlayerIndex;
+    private int nextBoardRow = -1;
+    private int nextBoardCol = -1;
+    private final boolean[][] miniBoardWon;
+    private boolean gameOver;
+    private JLabel statusLabel;
 
     public SuperTicTacToe() {
         setTitle("Super Tic-Tac-Toe");
-        setSize(720, 720);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        // Initialize game components
+        players = new Player[]{new Player("X"), new Player("O")};
+        currentPlayerIndex = 0;
+        boards = new Panel[3][3];
+        miniBoardWon = new boolean[3][3];
+        gameOver = false;
+
+        // Setup UI
+        setupUI();
+
+        pack();
+        setLocationRelativeTo(null);
         setResizable(false);
-        setLocationRelativeTo(null);  // Center the window
-        setLayout(new GridLayout(3, 3));  // Main 3x3 grid layout for mini-boards
-
-        // Initialize mini-boards (9 buttons per mini-board)
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                JPanel miniBoardPanel = new JPanel(new GridLayout(3, 3)); // 3x3 grid for each mini-board
-                for (int k = 0; k < 9; k++) {
-                    buttons[i][j][k] = new JButton("");
-                    buttons[i][j][k].setFont(new Font("Arial", Font.PLAIN, 40));
-                    buttons[i][j][k].setFocusPainted(false);
-                    buttons[i][j][k].setBackground(Color.WHITE);
-                    buttons[i][j][k].addActionListener(this);  // Add action listener to each button
-                    miniBoardPanel.add(buttons[i][j][k]);
-                }
-                add(miniBoardPanel);
-            }
-        }
-
         setVisible(true);
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        if (gameOver) return;  // Stop if the game is over
+    private void setupUI() {
+        JPanel mainPanel = new JPanel(new BorderLayout());
 
-        JButton clickedButton = (JButton) e.getSource();
+        // Status panel at the top
+        statusLabel = new JLabel("Player X's turn", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        mainPanel.add(statusLabel, BorderLayout.NORTH);
 
-        // Find the mini-board and index clicked
-        int clickedIndex = -1;
-        int row = -1, col = -1;
-        outerLoop:
+        // Game board panel
+        JPanel gameBoardPanel = new JPanel(new GridLayout(3, 3, 5, 5));
+        gameBoardPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        gameBoardPanel.setBackground(Color.DARK_GRAY);
+
+        // Initialize panels
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                for (int k = 0; k < 9; k++) {
-                    if (buttons[i][j][k] == clickedButton) {
-                        clickedIndex = k;
-                        row = i;
-                        col = j;
-                        break outerLoop;
-                    }
-                }
+                boards[i][j] = new Panel(this, i, j);
+                gameBoardPanel.add(boards[i][j]);
             }
         }
 
-        // Check if the mini-board is restricted and ensure it's not already won or tied
-        int targetRow = clickedIndex / 3;
-        int targetCol = clickedIndex % 3;
-
-        if ((nextBoard != -1 && (nextBoard != targetRow * 3 + targetCol || miniBoardWon[targetRow][targetCol])) || !clickedButton.getText().equals("")) {
-            return;  // Invalid move
-        }
-
-        // Mark the button with the current player's symbol
-        clickedButton.setText(currentPlayer);
-
-        // Check if the current mini-board is won
-        if (checkMiniBoardWin(row, col)) {
-            miniBoardWon[row][col] = true;
-        }
-
-        // Check if the entire game is won (main 3x3 grid)
-        if (checkMainBoardWin()) {
-            JOptionPane.showMessageDialog(this, currentPlayer + " Wins the game!");
-            gameOver = true;
-            return;
-        }
-
-        // Check if the game is a draw
-        if (checkDraw()) {
-            JOptionPane.showMessageDialog(this, "It's a draw!");
-            gameOver = true;
-            return;
-        }
-
-        // Determine where the opponent must play next
-        if (miniBoardWon[row][col]) {
-            nextBoard = -1;  // No restrictions, opponent can play anywhere
-        } else {
-            nextBoard = targetRow * 3 + targetCol;  // Restrict opponent to play in the corresponding mini-board
-        }
-
-        // Switch the player
-        currentPlayer = (currentPlayer.equals("X")) ? "O" : "X";
+        mainPanel.add(gameBoardPanel, BorderLayout.CENTER);
+        add(mainPanel);
     }
 
-    private boolean checkMiniBoardWin(int row, int col) {
-        // Winning conditions for a mini-board (3 rows, 3 columns, 2 diagonals)
-        int[][] winPatterns = {
-                {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  // Rows
-                {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  // Columns
-                {0, 4, 8}, {2, 4, 6}              // Diagonals
-        };
+    public boolean isValidMove(int boardRow, int boardCol) {
+        if (gameOver) return false;
 
-        for (int[] pattern : winPatterns) {
-            if (buttons[row][col][pattern[0]].getText().equals(currentPlayer) &&
-                    buttons[row][col][pattern[1]].getText().equals(currentPlayer) &&
-                    buttons[row][col][pattern[2]].getText().equals(currentPlayer)) {
-                return true;
+        // First move or if next board is won
+        if ((nextBoardRow == -1 && nextBoardCol == -1) ||
+                (nextBoardRow != -1 && nextBoardCol != -1 && miniBoardWon[nextBoardRow][nextBoardCol])) {
+            return !miniBoardWon[boardRow][boardCol];
+        }
+
+        // Must play in the specified board
+        return boardRow == nextBoardRow && boardCol == nextBoardCol && !miniBoardWon[boardRow][boardCol];
+    }
+
+    public void makeMove(int boardRow, int boardCol, int buttonRow, int buttonCol) {
+        Player currentPlayer = players[currentPlayerIndex];
+        boards[boardRow][boardCol].getButton(buttonRow, buttonCol).setText(currentPlayer.getSymbol());
+
+        // Check for win in mini-board
+        if (checkMiniBoardWin(boardRow, boardCol, currentPlayer.getSymbol())) {
+            miniBoardWon[boardRow][boardCol] = true;
+            boards[boardRow][boardCol].markWinner(currentPlayer.getSymbol());
+
+            // Check for main board win
+            if (checkMainBoardWin()) {
+                gameOver = true;
+                statusLabel.setText("Player " + currentPlayer.getSymbol() + " wins the game!");
+                return;
             }
         }
-        return false;
+
+        // Check for draw
+        if (checkDraw()) {
+            gameOver = true;
+            statusLabel.setText("Game Over - It's a draw!");
+            return;
+        }
+
+        // Update next board to play
+        updateNextBoard(buttonRow, buttonCol);
+
+        // Switch players
+        currentPlayerIndex = (currentPlayerIndex + 1) % 2;
+        updateBoardHighlights();
+        statusLabel.setText("Player " + players[currentPlayerIndex].getSymbol() + "'s turn");
+    }
+
+    private void updateNextBoard(int buttonRow, int buttonCol) {
+        if (miniBoardWon[buttonRow][buttonCol]) {
+            nextBoardRow = -1;
+            nextBoardCol = -1;
+        } else {
+            nextBoardRow = buttonRow;
+            nextBoardCol = buttonCol;
+        }
+    }
+
+    private void updateBoardHighlights() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                boolean isPlayable = isValidMove(i, j);
+                boards[i][j].highlightPanel(isPlayable);
+                boards[i][j].setPlayable(isPlayable);
+            }
+        }
+    }
+
+    private boolean checkMiniBoardWin(int boardRow, int boardCol, String symbol) {
+        Panel board = boards[boardRow][boardCol];
+
+        // Check rows, columns, and diagonals
+        for (int i = 0; i < 3; i++) {
+            if (checkLine(board, i, 0, i, 1, i, 2, symbol)) return true;  // Rows
+            if (checkLine(board, 0, i, 1, i, 2, i, symbol)) return true;  // Columns
+        }
+
+        // Check diagonals
+        return checkLine(board, 0, 0, 1, 1, 2, 2, symbol) ||  // Main diagonal
+                checkLine(board, 0, 2, 1, 1, 2, 0, symbol);    // Other diagonal
+    }
+
+    private boolean checkLine(Panel board, int r1, int c1, int r2, int c2, int r3, int c3, String symbol) {
+        return board.getButton(r1, c1).getText().equals(symbol) &&
+                board.getButton(r2, c2).getText().equals(symbol) &&
+                board.getButton(r3, c3).getText().equals(symbol);
     }
 
     private boolean checkMainBoardWin() {
-        // Check if three mini-boards in a row are won horizontally, vertically, or diagonally
+        // Check rows and columns
         for (int i = 0; i < 3; i++) {
-            if (miniBoardWon[i][0] && miniBoardWon[i][1] && miniBoardWon[i][2]) return true;  // Rows
-            if (miniBoardWon[0][i] && miniBoardWon[1][i] && miniBoardWon[2][i]) return true;  // Columns
+            if (checkMainLine(i, 0, i, 1, i, 2)) return true;  // Rows
+            if (checkMainLine(0, i, 1, i, 2, i)) return true;  // Columns
         }
-        if (miniBoardWon[0][0] && miniBoardWon[1][1] && miniBoardWon[2][2]) return true;  // Diagonal
-        if (miniBoardWon[0][2] && miniBoardWon[1][1] && miniBoardWon[2][0]) return true;  // Diagonal
-        return false;
+
+        // Check diagonals
+        return checkMainLine(0, 0, 1, 1, 2, 2) ||  // Main diagonal
+                checkMainLine(0, 2, 1, 1, 2, 0);    // Other diagonal
+    }
+
+    private boolean checkMainLine(int r1, int c1, int r2, int c2, int r3, int c3) {
+        return miniBoardWon[r1][c1] && miniBoardWon[r2][c2] && miniBoardWon[r3][c3] &&
+                boards[r1][c1].getButton(1, 1).getText().equals(
+                        boards[r2][c2].getButton(1, 1).getText()) &&
+                boards[r1][c1].getButton(1, 1).getText().equals(
+                        boards[r3][c3].getButton(1, 1).getText());
     }
 
     private boolean checkDraw() {
-        // Check if the game is a draw (all mini-boards are filled but no one has won)
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                for (int k = 0; k < 9; k++) {
-                    if (buttons[i][j][k].getText().equals("")) {
-                        return false;  // Found an empty spot, so the game is not a draw
+                for (int row = 0; row < 3; row++) {
+                    for (int col = 0; col < 3; col++) {
+                        if (boards[i][j].getButton(row, col).getText().isEmpty() && !miniBoardWon[i][j]) {
+                            return false;
+                        }
                     }
                 }
             }
         }
-        return true;  // No empty spots left, the game is a draw
+        return true;
     }
 
     public static void main(String[] args) {
-        new SuperTicTacToe();
+        SwingUtilities.invokeLater(SuperTicTacToe::new);
     }
 }
